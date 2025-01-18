@@ -1,16 +1,19 @@
-use std::{
-    fmt,
-    result,
-};
+use std::result;
 
 use enumset::{
     EnumSet,
     enum_set,
 };
+use miette::{
+    Diagnostic,
+    SourceOffset,
+    SourceSpan,
+};
 use peekmore::{
     PeekMore as _,
     PeekMoreIterator as PeekMore,
 };
+use thiserror::Error;
 
 use crate::{
     Kind::{
@@ -18,7 +21,9 @@ use crate::{
         *,
     },
     RowanNode,
-    node,
+    node::{
+        self,
+    },
 };
 
 /// A parse result that contains a [`rowan::SyntaxNode`],
@@ -184,10 +189,33 @@ const EXPRESSION_TOKENS: EnumSet<Kind> = enum_set!(
 
 const IDENTIFIER_TOKENS: EnumSet<Kind> = enum_set!(TOKEN_IDENTIFIER | TOKEN_IDENTIFIER_START);
 
+#[derive(Debug, Clone, Error, Diagnostic)]
+#[error("")]
+pub struct NodeErrorWithContext {
+    #[source_code]
+    pub source_code: String,
+    #[label("This bit here")]
+    pub span: SourceSpan,
+    #[source]
+    pub node_error: NodeError,
+}
+
+impl NodeErrorWithContext {
+    pub fn new(source_code: String, node_error: NodeError) -> NodeErrorWithContext {
+        let span = node_error.span();
+        NodeErrorWithContext {
+            source_code,
+            span: SourceSpan::new(SourceOffset::from(span.0), span.1 - span.0),
+            node_error,
+        }
+    }
+}
+
 /// A node error.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error, Diagnostic)]
 pub enum NodeError {
     /// An error that happens when the parsed expression is not a valid pattern.
+    #[error("Invalid Pattern: {got:?}")]
     InvalidPattern {
         /// The node that was not a valid pattern.
         got: Option<Kind>,
@@ -195,12 +223,14 @@ pub enum NodeError {
         at: rowan::TextRange,
     },
 
+    #[error("Invalid String Like: {reason:?}")]
     // An error that happens when a stringlike contains invalid escapes or is formatted wrongly.
     InvalidStringlike {
         reason: &'static str,
         at: rowan::TextRange,
     },
 
+    #[error("Unexpected: expected {expected:?}, got {}", match got {Some(x) => x.to_string(), None => "EOL".to_string()})]
     /// An error that happens when the noder was not expecting a particular
     /// token or node.
     Unexpected {
@@ -215,71 +245,83 @@ pub enum NodeError {
     },
 }
 
-impl fmt::Display for NodeError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl NodeError {
+    fn span(&self) -> (usize, usize) {
+        use NodeError::*;
         match self {
-            Self::InvalidPattern { got, .. } => {
-                if let Some(got) = got {
-                    write!(formatter, "{got} is not a valid pattern")
-                } else {
-                    write!(formatter, "no pattern to be found")
-                }
-            },
-
-            Self::InvalidStringlike { reason, .. } => write!(formatter, "{reason}"),
-
-            Self::Unexpected {
-                got: Some(got),
-                expected: const { EnumSet::empty() },
-                ..
-            } => {
-                write!(formatter, "expected end of file, got {got}")
-            },
-
-            &Self::Unexpected {
-                got, mut expected, ..
-            } => {
-                write!(formatter, "expected ")?;
-
-                if expected.is_superset(EXPRESSION_TOKENS) {
-                    expected.remove_all(EXPRESSION_TOKENS);
-                    write!(formatter, "an expression")?;
-
-                    match expected.iter().count() {
-                        0 => {},
-                        1 => write!(formatter, " or ")?,
-                        2.. => write!(formatter, ", ")?,
-                    }
-                }
-
-                if expected.is_superset(IDENTIFIER_TOKENS) {
-                    expected.remove(TOKEN_IDENTIFIER_START);
-                }
-
-                let mut iterator = expected.iter().peekmore();
-                while let Some(item) = iterator.next() {
-                    write!(
-                        formatter,
-                        "{item}{separator}",
-                        separator =
-                            match (iterator.peek().is_some(), iterator.peek_nth(1).is_some()) {
-                                (false, false) => "",
-                                (true, false) => " or ",
-                                (true, true) => ", ",
-                                _ => unreachable!(),
-                            }
-                    )?;
-                }
-
-                if let Some(got) = got {
-                    write!(formatter, ", got {got}")
-                } else {
-                    write!(formatter, ", reached end of file")
-                }
-            },
+            InvalidPattern { at, .. } => (at.start().into(), at.end().into()),
+            Unexpected { at, .. } => (at.start().into(), at.end().into()),
+            InvalidStringlike { at, .. } => (at.start().into(), at.end().into()),
         }
     }
 }
+
+// impl fmt::Display for NodeError {
+//     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         match self {
+//             Self::InvalidPattern { got, .. } => {
+//                 if let Some(got) = got {
+//                     write!(formatter, "{got} is not a valid pattern")
+//                 } else {
+//                     write!(formatter, "no pattern to be found")
+//                 }
+//             },
+
+//             Self::InvalidStringlike { reason, .. } => write!(formatter,
+// "{reason}"),
+
+//             Self::Unexpected {
+//                 got: Some(got),
+//                 expected: const { EnumSet::empty() },
+//                 ..
+//             } => {
+//                 write!(formatter, "expected end of file, got {got}")
+//             },
+
+//             &Self::Unexpected {
+//                 got, mut expected, ..
+//             } => {
+//                 write!(formatter, "expected ")?;
+
+//                 if expected.is_superset(EXPRESSION_TOKENS) {
+//                     expected.remove_all(EXPRESSION_TOKENS);
+//                     write!(formatter, "an expression")?;
+
+//                     match expected.iter().count() {
+//                         0 => {},
+//                         1 => write!(formatter, " or ")?,
+//                         2.. => write!(formatter, ", ")?,
+//                     }
+//                 }
+
+//                 if expected.is_superset(IDENTIFIER_TOKENS) {
+//                     expected.remove(TOKEN_IDENTIFIER_START);
+//                 }
+
+//                 let mut iterator = expected.iter().peekmore();
+//                 while let Some(item) = iterator.next() {
+//                     write!(
+//                         formatter,
+//                         "{item}{separator}",
+//                         separator =
+//                             match (iterator.peek().is_some(),
+// iterator.peek_nth(1).is_some()) {                                 (false,
+// false) => "",                                 (true, false) => " or ",
+//                                 (true, true) => ", ",
+//                                 _ => unreachable!(),
+//                             }
+//                     )?;
+//                 }
+
+//                 if let Some(got) = got {
+//                     write!(formatter, ", got {got}")
+//                 } else {
+//                     write!(formatter, ", reached end of file")
+//                 }
+//             },
+//         }
+//     }
+// }
 
 type Result<T> = result::Result<T, NodeError>;
 

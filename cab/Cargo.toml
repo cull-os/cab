@@ -11,6 +11,7 @@ clap-verbosity-flag = "3.0.2"
 codespan-reporting  = "0.11.1"
 env_logger          = "0.11.3"
 log                 = "0.4.21"
+thiserror           = "2"
 
 [dependencies.clap]
 version = "4.5.4"
@@ -23,3 +24,7 @@ features = [ "full" ]
 [dependencies.yansi]
 version = "1.0.1"
 features = [ "detect-env", "detect-tty", "hyperlink" ]
+
+[dependencies.miette]
+version  = "=7.4.0"
+features = [ "fancy" ]

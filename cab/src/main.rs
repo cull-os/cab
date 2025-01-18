@@ -5,25 +5,15 @@ use std::{
 
 use cab::syntax::{
     self,
-    NodeError,
 };
+use cab_syntax::NodeErrorWithContext;
 use clap::Parser as _;
 use clap_stdin::FileOrStdin;
 use clap_verbosity_flag::{
     InfoLevel,
     Verbosity,
 };
-use codespan_reporting::{
-    diagnostic::{
-        Diagnostic,
-        Label,
-    },
-    files::SimpleFiles,
-    term::{
-        self,
-        termcolor,
-    },
-};
+use codespan_reporting::term::termcolor;
 use yansi::Paint as _;
 
 #[derive(clap::Parser)]
@@ -66,22 +56,19 @@ enum Dump {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> miette::Result<()> {
     let cli = Cli::parse();
 
     yansi::whenever(yansi::Condition::TTY_AND_COLOR);
 
-    let (mut out, err) = {
+    let mut out = {
         let choice = if yansi::is_enabled() {
             termcolor::ColorChoice::Always
         } else {
             termcolor::ColorChoice::Never
         };
 
-        (
-            termcolor::StandardStream::stdout(choice),
-            termcolor::StandardStream::stderr(choice),
-        )
+        termcolor::StandardStream::stdout(choice)
     };
 
     // Trying to imitate clap to get a consistent experience.
@@ -102,14 +89,10 @@ async fn main() {
 
     match cli.command {
         Command::Dump { file, command } => {
-            let name = file.filename().to_owned();
             let contents = file.contents().unwrap_or_else(|error| {
                 log::error!("failed to read file: {error}");
                 process::exit(1);
             });
-
-            let mut files = SimpleFiles::new();
-            let file_id = files.add(name, &contents);
 
             match command {
                 Dump::Token { color } => {
@@ -135,23 +118,9 @@ async fn main() {
                         Default::default(),
                     );
 
-                    let error_config = term::Config::default();
-
-                    for error in &parse.errors {
-                        let diagnostic = Diagnostic::error()
-                            .with_message("syntax error")
-                            .with_labels(vec![
-                                Label::primary(file_id, match error {
-                                    NodeError::InvalidPattern { at, .. }
-                                    | NodeError::InvalidStringlike { at, .. }
-                                    | NodeError::Unexpected { at, .. } => {
-                                        at.start().into()..at.end().into()
-                                    },
-                                })
-                                .with_message(format!("{error}")),
-                            ]);
-
-                        term::emit(&mut err.lock(), &error_config, &files, &diagnostic).ok();
+                    for error in parse.errors.clone().into_iter() {
+                        let error = NodeErrorWithContext::new(contents.clone(), error);
+                        miette::Result::Err(error)?;
                     }
 
                     if matches!(command, Dump::Syntax) {
@@ -169,4 +138,5 @@ async fn main() {
             }
         },
     }
+    Ok(())
 }
