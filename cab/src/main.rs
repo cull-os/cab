@@ -1,18 +1,10 @@
-use std::{
-    io::Write as _,
-    process,
-};
+use std::{io::Write as _, process};
 
-use cab::syntax::{
-    self,
-};
+use cab::syntax::{self};
 use cab_syntax::NodeErrorWithContext;
 use clap::Parser as _;
 use clap_stdin::FileOrStdin;
-use clap_verbosity_flag::{
-    InfoLevel,
-    Verbosity,
-};
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use codespan_reporting::term::termcolor;
 use yansi::Paint as _;
 
@@ -120,7 +112,7 @@ async fn main() -> miette::Result<()> {
 
                     for error in parse.errors.clone().into_iter() {
                         let error = NodeErrorWithContext::new(contents.clone(), error);
-                        miette::Result::Err(error)?;
+                        println!("{:?}", Into::<miette::Report>::into(error));
                     }
 
                     if matches!(command, Dump::Syntax) {

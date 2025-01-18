@@ -1,29 +1,14 @@
 use std::result;
 
-use enumset::{
-    EnumSet,
-    enum_set,
-};
-use miette::{
-    Diagnostic,
-    SourceOffset,
-    SourceSpan,
-};
-use peekmore::{
-    PeekMore as _,
-    PeekMoreIterator as PeekMore,
-};
+use enumset::{EnumSet, enum_set};
+use miette::{Diagnostic, SourceOffset, SourceSpan};
+use peekmore::{PeekMore as _, PeekMoreIterator as PeekMore};
 use thiserror::Error;
 
 use crate::{
-    Kind::{
-        self,
-        *,
-    },
+    Kind::{self, *},
     RowanNode,
-    node::{
-        self,
-    },
+    node::{self},
 };
 
 /// A parse result that contains a [`rowan::SyntaxNode`],
@@ -380,13 +365,11 @@ impl<'a, I: Iterator<Item = (Kind, &'a str)>> Noder<'a, I> {
                 Ok(kind)
             },
 
-            None => {
-                Err(NodeError::Unexpected {
-                    got: None,
-                    expected: EnumSet::empty(),
-                    at: rowan::TextRange::empty(self.offset),
-                })
-            },
+            None => Err(NodeError::Unexpected {
+                got: None,
+                expected: EnumSet::empty(),
+                at: rowan::TextRange::empty(self.offset),
+            }),
         }
     }
 
@@ -615,11 +598,9 @@ impl<'a, I: Iterator<Item = (Kind, &'a str)>> Noder<'a, I> {
         };
 
         match differentiator_token {
-            Ok(Some(TOKEN_LITERAL_IS)) => {
-                self.node_from(start_of_if, NODE_IF_IS, |this| {
-                    this.node_expression_binding_power(is_binding_power, until)
-                })
-            },
+            Ok(Some(TOKEN_LITERAL_IS)) => self.node_from(start_of_if, NODE_IF_IS, |this| {
+                this.node_expression_binding_power(is_binding_power, until)
+            }),
 
             Ok(Some(TOKEN_LITERAL_THEN)) => {
                 self.node_failable_from(start_of_if, NODE_IF_ELSE, |this| {
@@ -677,12 +658,10 @@ impl<'a, I: Iterator<Item = (Kind, &'a str)>> Noder<'a, I> {
                 });
 
                 self.errors.push(match unexpected {
-                    Ok(next) => {
-                        NodeError::Unexpected {
-                            got: Some(next),
-                            expected: EXPRESSION_TOKENS,
-                            at: rowan::TextRange::new(start, self.offset),
-                        }
+                    Ok(next) => NodeError::Unexpected {
+                        got: Some(next),
+                        expected: EXPRESSION_TOKENS,
+                        at: rowan::TextRange::new(start, self.offset),
                     },
 
                     Err(error) => error,
