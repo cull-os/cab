@@ -13,7 +13,6 @@ use clap_verbosity_flag::{
     InfoLevel,
     Verbosity,
 };
-use codespan_reporting::term::termcolor;
 use yansi::Paint as _;
 
 #[derive(clap::Parser)]
@@ -61,15 +60,7 @@ async fn main() -> miette::Result<()> {
 
     yansi::whenever(yansi::Condition::TTY_AND_COLOR);
 
-    let mut out = {
-        let choice = if yansi::is_enabled() {
-            termcolor::ColorChoice::Always
-        } else {
-            termcolor::ColorChoice::Never
-        };
-
-        termcolor::StandardStream::stdout(choice)
-    };
+    let mut out = std::io::stdout();
 
     // Trying to imitate clap to get a consistent experience.
     env_logger::Builder::new()
