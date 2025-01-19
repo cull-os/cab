@@ -6,13 +6,14 @@ use std::{
 use cab::syntax::{
     self,
 };
-use cab_syntax::NodeErrorWithContext;
+use cab_syntax::NodeErrorWithSpan;
 use clap::Parser as _;
 use clap_stdin::FileOrStdin;
 use clap_verbosity_flag::{
     InfoLevel,
     Verbosity,
 };
+use miette::Error;
 use yansi::Paint as _;
 
 #[derive(clap::Parser)]
@@ -60,7 +61,7 @@ async fn main() -> miette::Result<()> {
 
     yansi::whenever(yansi::Condition::TTY_AND_COLOR);
 
-    let mut out = std::io::stdout();
+    let (mut out, mut err) = (std::io::stdout(), std::io::stderr());
 
     // Trying to imitate clap to get a consistent experience.
     env_logger::Builder::new()
@@ -110,8 +111,12 @@ async fn main() -> miette::Result<()> {
                     );
 
                     for error in parse.errors.clone().into_iter() {
-                        let error = NodeErrorWithContext::new(contents.clone(), error);
-                        println!("{:?}", Into::<miette::Report>::into(error));
+                        let _ = write!(
+                            err,
+                            "{:?}",
+                            (Error::new(NodeErrorWithSpan::new(error))
+                                .with_source_code(contents.clone()))
+                        ); // not sure if possible E should be handled..
                     }
 
                     if matches!(command, Dump::Syntax) {

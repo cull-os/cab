@@ -191,20 +191,19 @@ const IDENTIFIER_TOKENS: EnumSet<Kind> = enum_set!(TOKEN_IDENTIFIER | TOKEN_IDEN
 
 #[derive(Debug, Clone, Error, Diagnostic)]
 #[error("")]
-pub struct NodeErrorWithContext {
-    #[source_code]
-    pub source_code: String,
+pub struct NodeErrorWithSpan {
+    // pretty sure a struct with dedicated `span: SourceSpan`` field is required, maybe a
+    // "built-in" existts in miette, not sure.
     #[label("This bit here")]
     pub span: SourceSpan,
     #[source]
     pub node_error: NodeError,
 }
 
-impl NodeErrorWithContext {
-    pub fn new(source_code: String, node_error: NodeError) -> NodeErrorWithContext {
+impl NodeErrorWithSpan {
+    pub fn new(node_error: NodeError) -> NodeErrorWithSpan {
         let span = node_error.span();
-        NodeErrorWithContext {
-            source_code,
+        NodeErrorWithSpan {
             span: SourceSpan::new(SourceOffset::from(span.0), span.1 - span.0),
             node_error,
         }
