@@ -214,7 +214,7 @@ impl NodeErrorWithSpan {
 #[derive(Debug, Clone, PartialEq, Eq, Error, Diagnostic)]
 pub enum NodeError {
     /// An error that happens when the parsed expression is not a valid pattern.
-    #[error("Invalid Pattern: {got:?}")]
+    #[error("Invalid pattern: {got:?}")]
     InvalidPattern {
         /// The node that was not a valid pattern.
         got: Option<Kind>,
@@ -222,7 +222,7 @@ pub enum NodeError {
         at: rowan::TextRange,
     },
 
-    #[error("Invalid String Like: {reason:?}")]
+    #[error("Invalid string-like: {reason:?}")]
     // An error that happens when a stringlike contains invalid escapes or is formatted wrongly.
     InvalidStringlike {
         reason: &'static str,
