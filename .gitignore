@@ -13,6 +13,8 @@
 
 !docs/
 
+!examples/
+
 !fuzz/
 !fuzz/fuzz_targets/
 
